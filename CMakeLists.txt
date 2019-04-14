@@ -251,6 +251,7 @@ include_directories (BEFORE ${CMAKE_CURRENT_BINARY_DIR} dynasm src )
 
 add_library ( liblua-shared SHARED ${SRC_LJCORE} ${DEPS} )
 target_link_libraries ( liblua-shared ${LIBS} )
+target_include_directories( liblua-shared INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src )
 SET_TARGET_PROPERTIES(liblua-shared PROPERTIES 
   PREFIX "lib" IMPORT_PREFIX "lib" OUTPUT_NAME "lua")
 if ( WIN32 AND NOT CYGWIN )
@@ -259,6 +260,7 @@ endif ()
 
 add_library ( liblua-static STATIC ${SRC_LJCORE} ${DEPS} )
 target_link_libraries ( liblua-static ${LIBS} )
+target_include_directories( liblua-static INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src )
 SET_TARGET_PROPERTIES(liblua-static PROPERTIES
   COMPILE_DEFINITIONS "liblua_STATIC"
   OUTPUT_NAME "lua-static")

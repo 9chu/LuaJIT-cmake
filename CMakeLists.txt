@@ -3,6 +3,7 @@
 # Created by Peter Drahoš
 # Redistribution and use of this file is allowed according to the terms of the MIT license.
 # Debugged and (now seriously) modified by Ronan Collobert, for Torch7
+# Upgrade to luajit-2.1 by 9chu
 
 project(Lua C ASM)
 

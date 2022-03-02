@@ -9,6 +9,9 @@
 *.dmp
 *.swp
 .tags
+*~
+tags
+*.swo
 .idea/
 build/
 cmake-*-build/

@@ -378,48 +378,48 @@ void emit_lib(BuildCtx *ctx)
       char *p;
       /* Simplistic pre-processor. Only handles top-level #if/#endif. */
       if (buf[0] == '#' && buf[1] == 'i' && buf[2] == 'f') {
-	int ok = 1;
-	if (!strcmp(buf, "#if LJ_52\n"))
-	  ok = LJ_52;
-	else if (!strcmp(buf, "#if LJ_HASJIT\n"))
-	  ok = LJ_HASJIT;
-	else if (!strcmp(buf, "#if LJ_HASFFI\n"))
-	  ok = LJ_HASFFI;
-	else if (!strcmp(buf, "#if LJ_HASBUFFER\n"))
-	  ok = LJ_HASBUFFER;
-	if (!ok) {
-	  int lvl = 1;
-	  while (fgets(buf, sizeof(buf), fp) != NULL) {
-	    if (buf[0] == '#' && buf[1] == 'e' && buf[2] == 'n') {
-	      if (--lvl == 0) break;
-	    } else if (buf[0] == '#' && buf[1] == 'i' && buf[2] == 'f') {
-	      lvl++;
-	    }
-	  }
-	  continue;
-	}
+        int ok = 1;
+        if (!strcmp(buf, "#if LJ_52\n") || !strcmp(buf, "#if LJ_52\r\n"))
+          ok = LJ_52;
+        else if (!strcmp(buf, "#if LJ_HASJIT\n") || !strcmp(buf, "#if LJ_HASJIT\r\n"))
+          ok = LJ_HASJIT;
+        else if (!strcmp(buf, "#if LJ_HASFFI\n") || !strcmp(buf, "#if LJ_HASFFI\r\n"))
+          ok = LJ_HASFFI;
+        else if (!strcmp(buf, "#if LJ_HASBUFFER\n") || !strcmp(buf, "#if LJ_HASBUFFER\r\n"))
+          ok = LJ_HASBUFFER;
+        if (!ok) {
+          int lvl = 1;
+          while (fgets(buf, sizeof(buf), fp) != NULL) {
+            if (buf[0] == '#' && buf[1] == 'e' && buf[2] == 'n') {
+              if (--lvl == 0) break;
+            } else if (buf[0] == '#' && buf[1] == 'i' && buf[2] == 'f') {
+              lvl++;
+            }
+          }
+          continue;
+        }
       }
       for (p = buf; (p = strstr(p, LIBDEF_PREFIX)) != NULL; ) {
-	const LibDefHandler *ldh;
-	p += sizeof(LIBDEF_PREFIX)-1;
-	for (ldh = libdef_handlers; ldh->suffix != NULL; ldh++) {
-	  size_t n, len = strlen(ldh->suffix);
-	  if (!strncmp(p, ldh->suffix, len)) {
-	    p += len;
-	    n = ldh->stop ? strcspn(p, ldh->stop) : 0;
-	    if (!p[n]) break;
-	    p[n] = '\0';
-	    ldh->func(ctx, p, ldh->arg);
-	    p += n+1;
-	    break;
-	  }
-	}
-	if (ldh->suffix == NULL) {
-	  buf[strlen(buf)-1] = '\0';
-	  fprintf(stderr, "Error: unknown library definition tag %s%s\n",
-		  LIBDEF_PREFIX, p);
-	  exit(1);
-	}
+        const LibDefHandler *ldh;
+        p += sizeof(LIBDEF_PREFIX)-1;
+        for (ldh = libdef_handlers; ldh->suffix != NULL; ldh++) {
+          size_t n, len = strlen(ldh->suffix);
+          if (!strncmp(p, ldh->suffix, len)) {
+            p += len;
+            n = ldh->stop ? strcspn(p, ldh->stop) : 0;
+            if (!p[n]) break;
+            p[n] = '\0';
+            ldh->func(ctx, p, ldh->arg);
+            p += n+1;
+            break;
+          }
+        }
+        if (ldh->suffix == NULL) {
+          buf[strlen(buf)-1] = '\0';
+          fprintf(stderr, "Error: unknown library definition tag %s%s\n",
+            LIBDEF_PREFIX, p);
+          exit(1);
+        }
       }
     }
     fclose(fp);

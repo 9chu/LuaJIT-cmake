@@ -22,6 +22,7 @@ INCLUDE(CheckLibraryExists)
 INCLUDE(CheckFunctionExists)
 INCLUDE(CheckCSourceCompiles)
 INCLUDE(CheckTypeSize)
+INCLUDE(CheckCCompilerFlag)
 
 # LuaJIT specific
 option ( LUAJIT_DISABLE_FFI "Disable FFI." OFF )
@@ -29,7 +30,16 @@ option ( LUAJIT_ENABLE_LUA52COMPAT "Enable Lua 5.2 compatibility." OFF )
 option ( LUAJIT_DISABLE_JIT "Disable JIT." OFF )
 option ( LUAJIT_CPU_SSE2 "Use SSE2 instead of x87 instructions." ON )
 option ( LUAJIT_CPU_NOCMOV "Disable NOCMOV." OFF )
-MARK_AS_ADVANCED(LUAJIT_DISABLE_FFI LUAJIT_ENABLE_LUA52COMPAT LUAJIT_DISABLE_JIT LUAJIT_CPU_SSE2 LUAJIT_CPU_NOCMOV LUAJIT_RUN_DYNASM)
+option ( LUAJIT_DISABLE_GC64 "Disable LJ_GC64 mode for x64." OFF )
+
+# Debug purpose
+option ( LUAJIT_USE_SYSMALLOC "Use the system provided memory allocator (realloc)." OFF )
+option ( LUAJIT_USE_VALGRIND "This define is required to run LuaJIT under Valgrind." OFF )
+option ( LUAJIT_USE_GDBJIT "This is the client for the GDB JIT API." OFF )
+option ( LUA_USE_APICHECK "Turn on assertions for the Lua/C API to debug problems with lua_* calls." OFF )
+option ( LUA_USE_ASSERT "Turn on assertions for the whole LuaJIT VM." OFF )
+MARK_AS_ADVANCED(LUAJIT_DISABLE_FFI LUAJIT_ENABLE_LUA52COMPAT LUAJIT_DISABLE_JIT LUAJIT_CPU_SSE2 LUAJIT_CPU_NOCMOV LUAJIT_RUN_DYNASM LUAJIT_DISABLE_GC64
+  LUAJIT_USE_SYSMALLOC LUAJIT_USE_VALGRIND LUAJIT_USE_GDBJIT LUA_USE_APICHECK LUA_USE_ASSERT )
 
 CHECK_TYPE_SIZE("void*" SIZEOF_VOID_P)
 IF(SIZEOF_VOID_P EQUAL 8)
@@ -98,11 +108,11 @@ int main() { return 0; }
 ENDMACRO()
 
 SET(CMAKE_REQUIRED_INCLUDES ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/src)
-FOREACH(arch X64 X86 ARM ARM64 PPC PPCSPE MIPS S390X)
+FOREACH(arch X64 X86 ARM ARM64 PPC PPCSPE MIPS MIPS64 S390X)
   LJ_TEST_ARCH(LJ_TARGET_${arch})
   if(LJ_TARGET_${arch})
     STRING(TOLOWER ${arch} TARGET_LJARCH)
-    MESSAGE(INFO "LuaJIT Target ${ARCH_LJARCH}")
+    MESSAGE(STATUS "LuaJIT Target ${TARGET_LJARCH}")
     BREAK()
   ENDIF()
 ENDFOREACH()
@@ -116,9 +126,36 @@ SET(DASM_FLAGS)
 SET(TARGET_ARCH)
 LIST(APPEND TARGET_ARCH "LUAJIT_TARGET=LUAJIT_ARCH_${TARGET_LJARCH}")
 
-LJ_TEST_ARCH(__AARCH64EB__)
-IF(__AARCH64EB__)
-  LIST(APPEND TARGET_ARCH "D__AARCH64EB__=1")
+LJ_TEST_ARCH(LJ_TARGET_ARM64)
+IF(LJ_TARGET_ARM64)
+  LJ_TEST_ARCH(__AARCH64EB__)
+  IF(__AARCH64EB__)
+    LIST(APPEND TARGET_ARCH "__AARCH64EB__=1")
+  ENDIF()
+ENDIF()
+
+LJ_TEST_ARCH(LJ_TARGET_PPC)
+IF(LJ_TARGET_PPC)
+  LJ_TEST_ARCH_VALUE(LJ_LE 1)
+  IF(LJ_LE_1)
+    LIST(APPEND TARGET_ARCH "LJ_ARCH_ENDIAN=LUAJIT_LE")
+  ELSE()
+    LIST(APPEND TARGET_ARCH "LJ_ARCH_ENDIAN=LUAJIT_BE")
+  ENDIF()
+ENDIF()
+
+LJ_TEST_ARCH(LJ_TARGET_MIPS)
+IF(LJ_TARGET_MIPS)
+  LJ_TEST_ARCH(MIPSEL)
+  IF(NOT MIPSEL)
+    LIST(APPEND TARGET_ARCH "__MIPSEL__=1")
+  ENDIF()
+ENDIF()
+
+LJ_TEST_ARCH(LJ_TARGET_PS3)
+IF(LJ_TARGET_PS3)
+  LIST(APPEND TARGET_ARCH "__CELLOS_LV2__=1")
+  set ( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DLUAJIT_USE_SYSMALLOC" )
 ENDIF()
 
 LJ_TEST_ARCH_VALUE(LJ_LE 1)
@@ -174,7 +211,7 @@ ENDIF()
 #ENDIF()
 IF(TARGET_LJARCH STREQUAL "x64")
   LJ_TEST_ARCH_VALUE(LJ_FR2 1)
-  IF (LJ_FR2_1)
+  IF (NOT LJ_FR2_1)
     SET(DASM_ARCH "x86")
   ENDIF ()
 ENDIF()
@@ -189,30 +226,30 @@ IF(LJ_TARGET_MIPSR6_1)
 ENDIF()
 IF(TARGET_LJARCH STREQUAL "ppc")
   LJ_TEST_ARCH_VALUE(LJ_ARCH_SQRT 1)
-  IF(NOT LJ_ARCH_SQRT_1)
+  IF(LJ_ARCH_SQRT_1)
     SET(DASM_FLAGS ${DASM_FLAGS} -D SQRT)
   ENDIF()
   LJ_TEST_ARCH_VALUE(LJ_ARCH_ROUND 1)
-  IF(NOT LJ_ARCH_ROUND_1)
+  IF(LJ_ARCH_ROUND_1)
     SET(DASM_FLAGS ${DASM_FLAGS} -D ROUND)
   ENDIF()
   LJ_TEST_ARCH_VALUE(LJ_ARCH_PPC32ON64 1)
-  IF(NOT LJ_ARCH_PPC32ON64_1)
+  IF(LJ_ARCH_PPC32ON64_1)
     SET(DASM_FLAGS ${DASM_FLAGS} -D GPR64)
   ENDIF()
-  if(${CMAKE_SYSTEM_NAME} MATCHES "PS3")
+  if(LJ_TARGET_PS3)
     SET(DASM_FLAGS ${DASM_FLAGS} -D PPE)
   ENDIF()
   LJ_TEST_ARCH_VALUE(LJ_ARCH_PPC_OPD 1)
-  IF(NOT LJ_ARCH_PPC_OPD_1)
+  IF(LJ_ARCH_PPC_OPD_1)
     SET(DASM_FLAGS ${DASM_FLAGS} -D OPD)
   ENDIF()
   LJ_TEST_ARCH_VALUE(LJ_ARCH_PPC_OPDENV 1)
-  IF(NOT LJ_ARCH_PPC_OPDENV_1)
+  IF(LJ_ARCH_PPC_OPDENV_1)
     SET(DASM_FLAGS ${DASM_FLAGS} -D OPDENV)
   ENDIF()
   LJ_TEST_ARCH_VALUE(LJ_ARCH_PPC_ELFV2 1)
-  IF(NOT LJ_ARCH_PPC_ELFV2_1)
+  IF(LJ_ARCH_PPC_ELFV2_1)
     SET(DASM_FLAGS ${DASM_FLAGS} -D ELFV2)
   ENDIF()
 ENDIF()
@@ -220,14 +257,23 @@ IF(TARGET_LJARCH STREQUAL "s390x")  # untested
   SET(DASM_ARCH "s390x")
 ENDIF()
 
-#if ( WIN32 AND NOT CYGWIN )
+check_c_compiler_flag("-fno-stack-protector" HAS_NO_STACK_PROTECTOR)
+IF(HAS_NO_STACK_PROTECTOR)
+  set ( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-stack-protector")
+ENDIF()
+
+check_c_compiler_flag("-fomit-frame-pointer" HAS_OMIT_FRAME_POINTER)
+IF(HAS_NO_STACK_PROTECTOR)
+  set ( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fomit-frame-pointer")
+ENDIF()
+
 if ( WIN32 )
   add_definitions ( -DLUAJIT_OS=LUAJIT_OS_WINDOWS )
-  set ( CMAKE_C_FLAGS ${CMAKE_C_FLAGS} "-malign-double" )
+  IF(NOT MSVC)
+    set ( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -malign-double" )
+  ENDIF()
   set ( LJVM_MODE peobj )
 elseif ( APPLE )
-  #set ( CMAKE_EXE_LINKER_FLAGS "-pagezero_size 10000 -image_base 100000000 ${CMAKE_EXE_LINKER_FLAGS}" )
-  set ( CMAKE_C_FLAGS ${CMAKE_C_FLAGS} "-fexceptions" )
   set ( LJVM_MODE machasm )
   add_definitions ( -DLUAJIT_OS=LUAJIT_OS_OSX )
   if ( ${CMAKE_SYSTEM_NAME} MATCHES "Darwin" )
@@ -241,24 +287,44 @@ elseif ( APPLE )
   else ()
     add_definitions ( -DTARGET_OS_IPHONE=0 )
   endif ()
-elseif (${CMAKE_SYSTEM_NAME} MATCHES "SunOS")  # untested
-  set ( LJVM_MODE static )
-elseif (${CMAKE_SYSTEM_NAME} MATCHES "PS3")  # untested
-  set ( LJVM_MODE static )
 else ()
-  if (UNIX AND NOT APPLE)  # untested, may contain freebsd and so on
-    set ( CMAKE_C_FLAGS ${CMAKE_C_FLAGS} "-DLUAJIT_OS=LUAJIT_OS_LINUX")
-  else ()
-    set ( CMAKE_C_FLAGS ${CMAKE_C_FLAGS} "-DLUAJIT_OS=LUAJIT_OS_OTHER")
+  if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    add_definitions ( -DLUAJIT_OS=LUAJIT_OS_LINUX )
+  else()
+    add_definitions ( -DLUAJIT_OS=LUAJIT_OS_OTHER )
   endif ()
-  set ( CMAKE_C_FLAGS ${CMAKE_C_FLAGS} "-fexceptions" )
-  set ( LJVM_MODE elfasm )  
+
+  if (${CMAKE_SYSTEM_NAME} MATCHES "SunOS")
+    set ( LJVM_MODE static )
+  elseif (LJ_TARGET_PS3)
+    set ( LJVM_MODE static )
+  else()
+    set ( LJVM_MODE elfasm )
+  endif()
+
+  if (NOT LJ_NO_UNWIND_1)
+    # Find out whether the target toolchain always generates unwind tables.
+    execute_process(COMMAND bash "-c"
+      "exec 2>/dev/null; echo 'extern void b(void);int a(void){b();return 0;}' | ${CMAKE_C_COMPILER} -c -x c - -o tmpunwind.o && { grep -qa -e eh_frame -e __unwind_info tmpunwind.o || grep -qU -e eh_frame -e __unwind_info tmpunwind.o; } && echo E"
+      OUTPUT_VARIABLE TARGET_TESTUNWIND)
+    IF (${TARGET_TESTUNWIND} MATCHES "E")
+      message(STATUS "Use -DLUAJIT_UNWIND_EXTERNAL")
+      add_definitions ( -DLUAJIT_UNWIND_EXTERNAL )
+    endif ()
+  endif ()
+endif ()
+
+# lj_str_hash requirement
+LJ_TEST_ARCH_VALUE(LJ_HAS_OPTIMISED_HASH 1)
+IF (TARGET_LJARCH STREQUAL "x64" AND LJ_HAS_OPTIMISED_HASH_1)
+  set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse4.2")
 endif ()
 
 add_executable(minilua src/host/minilua.c)
 SET_TARGET_PROPERTIES(minilua PROPERTIES COMPILE_DEFINITIONS "${TARGET_ARCH}")
-CHECK_LIBRARY_EXISTS(m sin "" MINILUA_USE_LIBM)
+CHECK_LIBRARY_EXISTS(m pow "" MINILUA_USE_LIBM)
 if(MINILUA_USE_LIBM)
+  message(STATUS "Use libm to build minilua")
   TARGET_LINK_LIBRARIES(minilua m)
 endif()
 
@@ -281,7 +347,7 @@ SET(SRC_LJCORE src/lj_gc.c src/lj_err.c src/lj_char.c src/lj_bc.c src/lj_obj.c s
   src/lj_ctype.c src/lj_cdata.c src/lj_cconv.c src/lj_ccall.c src/lj_ccallback.c
   src/lj_carith.c src/lj_clib.c src/lj_cparse.c
   src/lj_lib.c src/lj_alloc.c src/lib_aux.c
-  src/lj_init.c src/lj_prng.c src/lj_serialize.c src/lj_str_hash.c 
+  src/lj_init.c src/lj_prng.c src/lj_serialize.c src/lj_str_hash.c
   ${SRC_LJLIB} src/lib_init.c)
 
 SET(SRC_BUILDVM src/host/buildvm.c src/host/buildvm_asm.c
@@ -314,23 +380,23 @@ add_buildvm_target ( lj_recdef.h  recdef  ${SRC_LJLIB} )
 add_buildvm_target ( lj_libdef.h  libdef  ${SRC_LJLIB} )
 add_buildvm_target ( vmdef.lua  vmdef  ${SRC_LJLIB} )
 
-SET(DEPS 
+SET(DEPS
   ${LJ_VM_SRC}
   ${CMAKE_CURRENT_BINARY_DIR}/lj_ffdef.h
   ${CMAKE_CURRENT_BINARY_DIR}/lj_bcdef.h
   ${CMAKE_CURRENT_BINARY_DIR}/lj_libdef.h
   ${CMAKE_CURRENT_BINARY_DIR}/lj_recdef.h
-  ${CMAKE_CURRENT_BINARY_DIR}/lj_folddef.h 
+  ${CMAKE_CURRENT_BINARY_DIR}/lj_folddef.h
   ${CMAKE_CURRENT_BINARY_DIR}/vmdef.lua
   )
-                  
+
 ## COMPILE
 include_directories (BEFORE ${CMAKE_CURRENT_BINARY_DIR} dynasm src )
 
 add_library ( liblua-shared SHARED ${SRC_LJCORE} ${DEPS} )
 target_link_libraries ( liblua-shared ${LIBS} )
 target_include_directories( liblua-shared INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src )
-SET_TARGET_PROPERTIES(liblua-shared PROPERTIES 
+SET_TARGET_PROPERTIES(liblua-shared PROPERTIES
   PREFIX "lib" IMPORT_PREFIX "lib" OUTPUT_NAME "lua")
 if ( WIN32 AND NOT CYGWIN )
   target_compile_definitions ( liblua-shared PRIVATE -DLUA_BUILD_AS_DLL )
@@ -359,7 +425,7 @@ INSTALL(TARGETS liblua-shared lua
 SET(LUA_LIBRARIES liblua-shared)
 SET(LUA_EXECUTABLE lua-static)
 SET(LUAC_EXECUTABLE torch-luac)
-SET(LUA_INCLUDE_DIR 
+SET(LUA_INCLUDE_DIR
   ${CMAKE_CURRENT_SOURCE_DIR}/src
   ${CMAKE_CURRENT_BINARY_DIR}
   ${READLINE_INCLUDE_DIR})

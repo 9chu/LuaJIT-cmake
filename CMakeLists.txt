@@ -29,6 +29,7 @@ option ( LUAJIT_DISABLE_FFI "Disable FFI." OFF )
 option ( LUAJIT_ENABLE_LUA52COMPAT "Enable Lua 5.2 compatibility." OFF )
 option ( LUAJIT_DISABLE_JIT "Disable JIT." OFF )
 option ( LUAJIT_DISABLE_GC64 "Disable LJ_GC64 mode for x64." OFF )
+option ( LUAJIT_DISABLE_BUFFER "Disable Buffer." OFF )  # openresty extension
 
 # Debug purpose
 option ( LUAJIT_USE_SYSMALLOC "Use the system provided memory allocator (realloc)." OFF )

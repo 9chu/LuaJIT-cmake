@@ -350,17 +350,23 @@ IF (TARGET_LJARCH STREQUAL "x64" AND LJ_HAS_OPTIMISED_HASH_1)
   set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse4.2")
 endif ()
 
-add_executable(minilua src/host/minilua.c)
-SET_TARGET_PROPERTIES(minilua PROPERTIES COMPILE_DEFINITIONS "${TARGET_ARCH}")
-CHECK_LIBRARY_EXISTS(m pow "" MINILUA_USE_LIBM)
-if(MINILUA_USE_LIBM)
-  message(STATUS "Use libm to build minilua")
-  TARGET_LINK_LIBRARIES(minilua m)
+if(CMAKE_CROSSCOMPILING)
+  # https://cmake.org/cmake/help/book/mastering-cmake/chapter/Cross%20Compiling%20With%20CMake.html
+  find_package(LuajitBuildTools)
+else()
+  add_executable(minilua src/host/minilua.c)
+  SET_TARGET_PROPERTIES(minilua PROPERTIES COMPILE_DEFINITIONS "${TARGET_ARCH}")
+  CHECK_LIBRARY_EXISTS(m pow "" MINILUA_USE_LIBM)
+  if(MINILUA_USE_LIBM)
+    message(STATUS "Use libm to build minilua")
+    TARGET_LINK_LIBRARIES(minilua m)
+  endif()
+  export(TARGETS minilua FILE "${CMAKE_BINARY_DIR}/LuajitBuildToolsConfig.cmake")
 endif()
 
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/buildvm_arch.h
-  COMMAND minilua ${CMAKE_CURRENT_SOURCE_DIR}/dynasm/dynasm.lua ${DASM_FLAGS} -o ${CMAKE_CURRENT_BINARY_DIR}/buildvm_arch.h ${CMAKE_CURRENT_SOURCE_DIR}/src/vm_${DASM_ARCH}.dasc
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/dynasm/dynasm.lua minilua
+  COMMAND "$<TARGET_FILE:minilua>" ${CMAKE_CURRENT_SOURCE_DIR}/dynasm/dynasm.lua ${DASM_FLAGS} -o ${CMAKE_CURRENT_BINARY_DIR}/buildvm_arch.h ${CMAKE_CURRENT_SOURCE_DIR}/src/vm_${DASM_ARCH}.dasc
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/dynasm/dynasm.lua "$<TARGET_FILE:minilua>"
 )
 
 SET(SRC_LJLIB src/lib_base.c src/lib_math.c src/lib_bit.c src/lib_string.c src/lib_table.c

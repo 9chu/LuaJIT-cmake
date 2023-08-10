@@ -350,10 +350,14 @@ IF (TARGET_LJARCH STREQUAL "x64" AND LJ_HAS_OPTIMISED_HASH_1)
   set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse4.2")
 endif ()
 
+# Cross-compiling support (for Android)
 if(CMAKE_CROSSCOMPILING)
   # https://cmake.org/cmake/help/book/mastering-cmake/chapter/Cross%20Compiling%20With%20CMake.html
   find_package(LuajitBuildTools)
-else()
+endif()
+
+# minilua
+if(NOT CMAKE_CROSSCOMPILING)
   add_executable(minilua src/host/minilua.c)
   SET_TARGET_PROPERTIES(minilua PROPERTIES COMPILE_DEFINITIONS "${TARGET_ARCH}")
   CHECK_LIBRARY_EXISTS(m pow "" MINILUA_USE_LIBM)
@@ -361,7 +365,6 @@ else()
     message(STATUS "Use libm to build minilua")
     TARGET_LINK_LIBRARIES(minilua m)
   endif()
-  export(TARGETS minilua FILE "${CMAKE_BINARY_DIR}/LuajitBuildToolsConfig.cmake")
 endif()
 
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/buildvm_arch.h
@@ -387,18 +390,27 @@ SET(SRC_LJCORE src/lj_gc.c src/lj_err.c src/lj_char.c src/lj_bc.c src/lj_obj.c s
   ${SRC_LJLIB} src/lib_init.c)
 
 SET(SRC_BUILDVM src/host/buildvm.c src/host/buildvm_asm.c
-src/host/buildvm_peobj.c src/host/buildvm_lib.c src/host/buildvm_fold.c
-${CMAKE_CURRENT_BINARY_DIR}/buildvm_arch.h)
+  src/host/buildvm_peobj.c src/host/buildvm_lib.c src/host/buildvm_fold.c
+  ${CMAKE_CURRENT_BINARY_DIR}/buildvm_arch.h)
 
 ## GENERATE
-ADD_EXECUTABLE(buildvm ${SRC_BUILDVM})
-SET_TARGET_PROPERTIES(buildvm PROPERTIES COMPILE_DEFINITIONS "${TARGET_ARCH}")
+
+# buildvm
+if(NOT CMAKE_CROSSCOMPILING)
+  ADD_EXECUTABLE(buildvm ${SRC_BUILDVM})
+  SET_TARGET_PROPERTIES(buildvm PROPERTIES COMPILE_DEFINITIONS "${TARGET_ARCH}")
+endif()
+
+# export compile-time tools for cross-compiling purpose
+if(NOT CMAKE_CROSSCOMPILING)
+  export(TARGETS minilua buildvm FILE "${CMAKE_BINARY_DIR}/LuajitBuildToolsConfig.cmake")
+endif()
 
 macro(add_buildvm_target _target _mode)
   add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${_target}
-    COMMAND buildvm ARGS -m ${_mode} -o ${CMAKE_CURRENT_BINARY_DIR}/${_target} ${ARGN}
+    COMMAND "$<TARGET_FILE:buildvm>" ARGS -m ${_mode} -o ${CMAKE_CURRENT_BINARY_DIR}/${_target} ${ARGN}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    DEPENDS buildvm ${ARGN}
+    DEPENDS "$<TARGET_FILE:buildvm>" ${ARGN}
   )
 endmacro(add_buildvm_target)
 

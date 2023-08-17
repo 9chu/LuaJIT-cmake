@@ -724,7 +724,7 @@ if(CMAKE_CROSSCOMPILING)
 
         # run host cmake
         execute_process(COMMAND "${CMAKE_COMMAND}"
-            "-E" "env" "CC=" "CXX=" "LD="  # using host default compiler, FIXME: customize?
+            "-E" "env" "CC=" "CXX=" "ASM=" "SYSROOT="  # using host default compiler, FIXME: customize?
             "${CMAKE_COMMAND}"
             "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
             "-DLUAJIT_OPTION_DISABLE_FFI=${LUAJIT_OPTION_DISABLE_FFI}"

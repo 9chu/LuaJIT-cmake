@@ -1,3 +1,5 @@
+include(CheckCCompilerFlag)
+
 function(luajit_build_host_tools)
     ##### Parse arguments
 
@@ -39,6 +41,34 @@ function(luajit_build_host_tools)
     cmake_parse_arguments(HOST_TOOL "" "${ONE_VALUE_ARGS}" "${MULTI_VALUE_ARGS}" ${ARGN})
 
     ##### Common compiler flags
+
+    if(HOST_TOOL_DASM_BIT64)
+        if(NOT ${CMAKE_SIZEOF_VOID_P} EQUAL 8)
+            set(CMAKE_REQUIRED_LINK_OPTIONS_OLD ${CMAKE_REQUIRED_LINK_OPTIONS})
+
+            set(CMAKE_REQUIRED_LINK_OPTIONS "-m64")
+            check_c_compiler_flag("-m64" HAS_M64)
+            if(HAS_M64)
+                set(FORCE_TARGET_64BIT 1)
+            else()
+                message(FATAL_ERROR "64bit build target is required")
+            endif()
+            set(CMAKE_REQUIRED_LINK_OPTIONS ${CMAKE_REQUIRED_LINK_OPTIONS_OLD})
+        endif()
+    else()
+        if(NOT ${CMAKE_SIZEOF_VOID_P} EQUAL 4)
+            set(CMAKE_REQUIRED_LINK_OPTIONS_OLD ${CMAKE_REQUIRED_LINK_OPTIONS})
+
+            set(CMAKE_REQUIRED_LINK_OPTIONS "-m32")
+            check_c_compiler_flag("-m32" HAS_M32)
+            if(HAS_M32)
+                set(FORCE_TARGET_32BIT 1)
+            else()
+                message(FATAL_ERROR "32bit build target is required")
+            endif()
+            set(CMAKE_REQUIRED_LINK_OPTIONS ${CMAKE_REQUIRED_LINK_OPTIONS_OLD})
+        endif()
+    endif()
 
     if(HOST_TOOL_TARGET_SYS STREQUAL "Windows")
         check_c_compiler_flag("-malign-double" HAS_ALIGN_DOUBLE)
@@ -195,6 +225,11 @@ function(luajit_build_host_tools)
     add_executable(buildvm ${HOST_TOOL_BUILDVM_SOURCES} "${CMAKE_CURRENT_BINARY_DIR}/buildvm_arch.h")
     target_include_directories(buildvm PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${HOST_TOOL_BUILDVM_INCLUDES})
     target_compile_definitions(buildvm PRIVATE ${TARGET_ARCH})
+    if(FORCE_TARGET_64BIT)
+        set_target_properties(buildvm PROPERTIES COMPILE_FLAGS "-m64" LINK_FLAGS "-m64")
+    elseif(FORCE_TARGET_32BIT)
+        set_target_properties(buildvm PROPERTIES COMPILE_FLAGS "-m32" LINK_FLAGS "-m32")
+    endif()
 
     export(TARGETS minilua buildvm FILE "${CMAKE_BINARY_DIR}/LuaJITHostToolsConfig.cmake")
 endfunction()

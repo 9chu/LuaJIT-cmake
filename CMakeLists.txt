@@ -454,7 +454,7 @@ else()
             test_target_arch_equals(LJ_NO_UNWIND 1)
             if(NOT LJ_NO_UNWIND_1)
                 execute_process(COMMAND bash "-c"
-                    "exec 2>/dev/null; echo 'extern void b(void);int a(void){b();return 0;}' | ${CMAKE_C_COMPILER} -c -x c - -o tmpunwind.o && { grep -qa -e eh_frame -e __unwind_info tmpunwind.o || grep -qU -e eh_frame -e __unwind_info tmpunwind.o; } && echo E"
+                    "exec 2>/dev/null; echo 'extern void b(void);int a(void){b();return 0;}' | ${CMAKE_C_COMPILER} -c -x c - -o '${CMAKE_CURRENT_BINARY_DIR}/tmpunwind.o' && { grep -qa -e eh_frame -e __unwind_info '${CMAKE_CURRENT_BINARY_DIR}/tmpunwind.o' || grep -qU -e eh_frame -e __unwind_info '${CMAKE_CURRENT_BINARY_DIR}/tmpunwind.o'; } && echo E"
                     OUTPUT_VARIABLE TARGET_TESTUNWIND)
                 if(${TARGET_TESTUNWIND} MATCHES "E")
                     list(APPEND TARGET_XCFLAGS "-DLUAJIT_UNWIND_EXTERNAL")
